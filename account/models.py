@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from .manager import UserManager
+from django.utils import timezone
 
 class TimeStamp(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -16,7 +17,10 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStamp):
     password_confirm = models.CharField(max_length=255)
     phone_no = models.IntegerField(null=True, blank=True)
     is_staff = models.BooleanField(default=False)
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=False)
+    verification_code = models.CharField(max_length=100, null=True, blank=True)
+    is_verified = models.BooleanField(default=False)
+    token_created = models.DateTimeField(default=timezone.now, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
     objects = UserManager()
@@ -25,6 +29,10 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStamp):
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
+    
+    def is_expired(self):
+        expiration_time=self.token_created + timezone.timedelta(hours=1)
+        return timezone.now() > expiration_time
     
 
 class UserAddress(TimeStamp):
@@ -41,11 +49,11 @@ class UserProfile(models.Model):
     bio = models.TextField(max_length=500, blank=True, null=True)
     date_of_birth = models.DateField(blank=True, null=True)
 
-class EmailVerification(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    verification_code = models.CharField(max_length=255)
-    created_at = models.DateTimeField(auto_now_add=True)
-    is_verified = models.BooleanField(default=False)
-    expired_at = models.DateTimeField()
+# class EmailVerification(models.Model):
+#     user = models.ForeignKey(User, on_delete=models.CASCADE)
+#     verification_code = models.CharField(max_length=255)
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     is_verified = models.BooleanField(default=False)
+#     expired_at = models.DateTimeField()
 
 

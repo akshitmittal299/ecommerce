@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import User
 from .utils import send_welcome_email
-
+import uuid
 class UserRegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -17,6 +17,8 @@ class UserRegisterSerializer(serializers.ModelSerializer):
         password = validated_data.pop('password')
         user= self.Meta.model.objects.create_user(**validated_data)
         user.set_password(password)
+        user.verification_code = uuid.uuid4()
+        print(user.verification_code)
         user.password_confirm = user.password
         user.save()
         send_welcome_email(user)

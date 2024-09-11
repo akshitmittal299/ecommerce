@@ -21,7 +21,11 @@ def send_welcome_email(user):
     from_email='akshit.testinguser@gmail.com',
     to_emails=user.email,
     subject='Welcome to our ecommerce website',
-    html_content="""<strong>We're thrilled to have you on board and can't wait for you to explore all that we have to offer. Here’s a quick overview to get you started:</strong>""")
+    html_content=f"""<!-- templates/email_verification.html -->
+        <p>Hello { user.first_name },</p>
+        <p>Thank you for registering. Please click the link below to activate your account:</p>
+        <p><a href="http://localhost:8000/verify-email/?token={user.verification_code}">Activate your account</a></p>
+        """)
     try:
         # sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
         sg= SendGridAPIClient(settings.SENDGRID_API_KEY)
