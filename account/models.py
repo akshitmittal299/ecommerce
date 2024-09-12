@@ -11,11 +11,16 @@ class TimeStamp(models.Model):
         abstract = True
 
 class User(AbstractBaseUser, PermissionsMixin, TimeStamp):
+    ROLE_CHOICES =[
+        ('user', "user"),
+        ('admin', 'admin')
+    ]
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
     email = models.EmailField(unique=True)
     password_confirm = models.CharField(max_length=255)
     phone_no = models.IntegerField(null=True, blank=True)
+    role = models.CharField(max_length=50, choices=ROLE_CHOICES, default="user")
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=False)
     verification_code = models.CharField(max_length=100, null=True, blank=True)
@@ -49,11 +54,5 @@ class UserProfile(models.Model):
     bio = models.TextField(max_length=500, blank=True, null=True)
     date_of_birth = models.DateField(blank=True, null=True)
 
-# class EmailVerification(models.Model):
-#     user = models.ForeignKey(User, on_delete=models.CASCADE)
-#     verification_code = models.CharField(max_length=255)
-#     created_at = models.DateTimeField(auto_now_add=True)
-#     is_verified = models.BooleanField(default=False)
-#     expired_at = models.DateTimeField()
 
 

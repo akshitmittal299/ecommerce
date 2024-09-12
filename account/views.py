@@ -1,11 +1,13 @@
 from rest_framework import viewsets, status, generics
 from rest_framework.views import APIView
-from .serializer import UserRegisterSerializer, UserLoginSerializer
+from .serializer import UserAddressSerializer, UserProfileSerializer, UserRegisterSerializer, UserLoginSerializer
 from rest_framework.response import Response
 from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
-from .models import User
-class UserRegisterView(generics.CreateAPIView):
+from .models import *
+
+class UserViewset(viewsets.ModelViewSet):
+    queryset = User.objects.all()
     serializer_class = UserRegisterSerializer
 
     def post(self, request):
@@ -18,6 +20,7 @@ class UserRegisterView(generics.CreateAPIView):
 
 class UserLoginView(APIView):
     serializer_class = UserLoginSerializer
+
     def post(self, request):
         serializer =  self.serializer_class(data=request.data)
         if serializer.is_valid():
@@ -41,14 +44,20 @@ class VerifyEmailView(APIView):
             if user.is_expired():
                 return Response({"success":False, "response_data":"token is expired"}, status=400)
             elif user:
-                print(user)
                 user.is_verified = True
                 user.is_active = True
                 user.verification_code = ""
                 user.token_created = None
-                print(user.verification_code)
                 user.save()
-                print(user)
                 return Response({"success":True, "response_data":"email successfully verified"}, status = status.HTTP_200_OK)
         except:
             return Response({"success":False, "response_data":"Invalid Verification token"}, status = status.HTTP_404_NOT_FOUND)
+        
+class UserProfileViewset(viewsets.ModelViewSet):
+    serializer_class = UserProfileSerializer
+    queryset = UserProfile.objects.all()
+
+
+class UserAddressViewset(viewsets.ModelViewSet):
+    serializer_class = UserAddressSerializer
+    queryset = UserAddress.objects.all()
