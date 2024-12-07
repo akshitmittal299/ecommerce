@@ -1,41 +1,67 @@
-from rest_framework import viewsets, status, generics
+from rest_framework import viewsets, status, generics, permissions
 from rest_framework.views import APIView
-from .serializer import UserAddressSerializer, UserProfileSerializer, UserRegisterSerializer, UserLoginSerializer
+from .serializer import *
 from rest_framework.response import Response
 from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
 from .models import *
+from django.shortcuts import render
+from rest_framework_simplejwt.views import TokenObtainPairView
+import stripe
+from django.conf import settings
+from django.db import transaction
 
-class UserViewset(viewsets.ModelViewSet):
+stripe.api_key = settings.STRIPE_TEST_SECRET_KEY
+
+class RegisterUserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
-    serializer_class = UserRegisterSerializer
+    serializer_class = UserSerializer
 
-    def post(self, request):
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        # Create the user first
         serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response({"success":True, "response_data":serializer.data}, status=status.HTTP_201_CREATED)
-        return Response({"success":False, "response_data":serializer.errors}, status= 400)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
 
+        # Create a Stripe customer after the user is created
+        try:
+            stripe_customer = stripe.Customer.create(
+                email=user.email,
+                name=f"{user.first_name} {user.last_name}",
+            )
 
-class UserLoginView(APIView):
-    serializer_class = UserLoginSerializer
-
-    def post(self, request):
-        serializer =  self.serializer_class(data=request.data)
-        if serializer.is_valid():
-            user = authenticate(email=serializer.validated_data["email"], password=serializer.validated_data["password"])
-            if user: 
-                if user.is_active and user.is_verified:
-                    token , created = Token.objects.get_or_create(user = user)
-                    return Response({"success":True, "response_data":{"token":token.key}}, status=200)
-                return Response({"success":False, "response_data":"verify your email"}, status=status.HTTP_401_UNAUTHORIZED)
-            else:
-                return Response({"success":"false", "response_data":"email or password is incorrect"}, status = status.HTTP_401_UNAUTHORIZED)
-        return Response({"success":"false", "response_data":serializer.error_messages}, status=400)
-            # token, create = Token.objects.get_or_create()
+            # Create a StripeCustomer record in the database
+            StripeCustomer.objects.create(
+                user=user,
+                stripe_customer_id=stripe_customer.id,
+            )
             
+            # Respond with the user and their Stripe customer ID
+            return Response({
+                'user': UserSerializer(user).data,
+                'stripe_customer_id': stripe_customer.id,
+            })
+        except stripe.error.StripeError as e:
+            # Handle Stripe error if something goes wrong
+            return Response({"error": str(e)}, status=400)
+
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    def post(self, request, *args, **kwargs):
+        # Call the original post method to get the tokens
+        response = super().post(request, *args, **kwargs)
         
+        # Add a custom message and status
+        response_data = {
+            "status": "success",
+            "message": "Login successful",  # You can customize this message
+            "data": response.data  # This contains the 'access' and 'refresh' tokens
+        }
+        
+        return Response(response_data, status=status.HTTP_200_OK)    
+
+
 class VerifyEmailView(APIView):
     def get(self, request):
         token = request.GET.get("token")
@@ -61,3 +87,8 @@ class UserProfileViewset(viewsets.ModelViewSet):
 class UserAddressViewset(viewsets.ModelViewSet):
     serializer_class = UserAddressSerializer
     queryset = UserAddress.objects.all()
+
+
+class StripeCustomerViewset(viewsets.ModelViewSet):
+    serializer_class = StripeCustomerSerializer
+    queryset = StripeCustomer.objects.all()
