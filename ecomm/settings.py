@@ -149,7 +149,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 FRONTEND_URL = os.getenv("FRONTEND_URL")
 #sendgrip credentials
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
-
+FORGOT_TEMPLATE_ID =os.getenv("FORGOT_TEMPLATE_ID")
 #stripe credentials
 STRIPE_TEST_PUBLIC_KEY = os.getenv('STRIPE_TEST_PUBLIC_KEY', 'your-publishable-key')
 STRIPE_TEST_SECRET_KEY = os.getenv('STRIPE_TEST_SECRET_KEY', 'your-secret-key')

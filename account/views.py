@@ -14,7 +14,7 @@ from django.conf import settings
 from django.db import transaction
 from django.contrib.auth.tokens import default_token_generator
 from .utils import send_forgot_password_email  
-from django.contrib.auth.hashers import make_password  # To hash the new password
+from django.contrib.auth.hashers import make_password
 from rest_framework.exceptions import ValidationError
 from rest_framework import permissions
 stripe.api_key = settings.STRIPE_TEST_SECRET_KEY
@@ -26,25 +26,22 @@ class RegisterUserViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
-        # Create the user first
+        
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
-        # Create a Stripe customer after the user is created
         try:
             stripe_customer = stripe.Customer.create(
                 email=user.email,
                 name=f"{user.first_name} {user.last_name}",
             )
 
-            # Create a StripeCustomer record in the database
             StripeCustomer.objects.create(
                 user=user,
                 stripe_customer_id=stripe_customer.id,
             )
             
-            # Respond with the user and their Stripe customer ID
             return Response({
                 "success":True,
                 "message":"user registered successfully",
@@ -52,20 +49,17 @@ class RegisterUserViewSet(viewsets.ModelViewSet):
                 'stripe_customer_id': stripe_customer.id,
             })
         except stripe.error.StripeError as e:
-            # Handle Stripe error if something goes wrong
             return Response({"error": str(e)}, status=400)
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
-        # Call the original post method to get the tokens
         response = super().post(request, *args, **kwargs)
         
-        # Add a custom message and status
         response_data = {
             "status": "success",
-            "message": "Login successful",  # You can customize this message
-            "data": response.data  # This contains the 'access' and 'refresh' tokens
+            "message": "Login successful",  
+            "data": response.data  
         }
         
         return Response(response_data, status=status.HTTP_200_OK)    
@@ -92,12 +86,12 @@ class VerifyEmailView(APIView):
 class UserProfileViewset(viewsets.ModelViewSet):
     serializer_class = UserProfileSerializer
     queryset = UserProfile.objects.all()
-
+    permission_classes = [permissions.AllowAny]
 
 class UserAddressViewset(viewsets.ModelViewSet):
     serializer_class = UserAddressSerializer
     queryset = UserAddress.objects.all()
-
+    permission_classes =[permissions.AllowAny]
 
 class StripeCustomerViewset(viewsets.ModelViewSet):
     serializer_class = StripeCustomerSerializer
@@ -108,76 +102,74 @@ class GetUserProfile(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        user = request.user  # Get the authenticated user
+        user = request.user 
         serializer = UserSerializer(user)
         return Response(serializer.data)
     
 
 class ForgotPasswordView(APIView):
     permission_classes = [permissions.AllowAny]
+
     def post(self, request):
         email = request.data.get("email")
 
-        # Validate if email is provided
         if not email:
             return Response({"detail": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # Retrieve the user based on the provided email
             user = User.objects.get(email=email)
         except User.DoesNotExist:
-            # Return a response if user doesn't exist
-            return Response({"success":False,"message": "User with this email does not exist."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"success": False, "message": "User with this email does not exist."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Generate the password reset token
         token = default_token_generator.make_token(user)
-        print(token)
-        # reset_link = settings.FRONTEND_URL + "reset-password/"+token+"/"  # Construct the reset link
-        # print(reset_link, "herer")
+        reset_link = f"{settings.FRONTEND_URL}reset-password/{token}/" 
+        
         try:
-            # Call the utility function to send the reset email
             send_forgot_password_email(user, token)
         except Exception as e:
-            # If the email sending fails, return an error response
-            return Response({"success":False,"message": f"Error sending email: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"success": False, "message": f"Error sending email: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # Return success response if email was sent successfully
-        return Response({"success":True,"message": "Password reset email has been sent."}, status=status.HTTP_200_OK)
-
-
-
+        return Response({"success": True, "message": "Password reset email has been sent."}, status=status.HTTP_200_OK)
 
 
 class ResetPasswordView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [permissions.AllowAny]
+
     def get_user_from_token(self, token):
-        """
-        Helper function to retrieve the user from the reset token.
-        """
-        try:
-            user = User.objects.get(email=default_token_generator.check_token(user, token))
-            return user
-        except:
-            return None
+        for user in User.objects.all():
+            if default_token_generator.check_token(user, token):
+                return user
+        return None
+
     def post(self, request, token):
-        # Retrieve the new password from the request
         new_password = request.data.get("new_password")
 
-        # Validate if new password is provided
         if not new_password:
             return Response({"detail": "New password is required."}, status=status.HTTP_400_BAD_REQUEST)
-        print(token)
-        # Get the user based on the token (no need to iterate over all users)
         user = self.get_user_from_token(token)
-        print(user)
+
         if not user:
             raise ValidationError("The password reset token is invalid or has expired.")
 
-        # Set the new password
-        user.password = make_password(new_password)
+        user.set_password(new_password)
         user.save()
 
+        return Response({"success": True, "message": "Password has been successfully reset."}, status=status.HTTP_200_OK)
 
+class ChangePasswordView(APIView):
+    serializer_class = ChangePasswordSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
-        # Return success response
-        return Response({"detail": "Your password has been successfully reset."}, status=status.HTTP_200_OK)
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        
+        if serializer.is_valid():
+            user = request.user
+            old_password = serializer.validated_data['old_password']
+            if not user.check_password(old_password):
+                raise serializers.ValidationError("Old password is incorrect.")
+            new_password = serializer.validated_data['new_password']
+            user.set_password(new_password)
+            user.save()
+            return Response({"success": True, "message": "Password changed successfully"}, status=status.HTTP_200_OK)
+        return Response({"success":False, "error":serializer.errors}, status=status.HTTP_400_BAD_REQUEST)

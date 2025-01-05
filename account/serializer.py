@@ -56,3 +56,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
         if hasattr(obj, 'userprofile'):
             return UserProfileSerializer(obj.userprofile).data
         return None
+    
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField()
+    new_password = serializers.CharField()

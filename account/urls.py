@@ -22,6 +22,7 @@ urlpatterns= [
     path("get/", GetUserProfile.as_view()),
     path("forgot-password/", ForgotPasswordView.as_view()),
     path('reset-password/<str:token>/', ResetPasswordView.as_view(), name='reset-password'),
+    path('change-password/', ChangePasswordView.as_view(), name='change-password'),
 
 ]
 
