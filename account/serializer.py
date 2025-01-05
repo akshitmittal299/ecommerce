@@ -12,16 +12,12 @@ class UserSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         password = validated_data.pop('password')
-        user= self.Meta.model.objects.create_user(**validated_data)
+        user= User.objects.create_user(**validated_data)
         user.set_password(password)
         user.verification_code = uuid.uuid4()
         user.save()
         send_welcome_email(user)
         return user
-    
-class UserLoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    password = serializers.CharField(max_length=50)
 
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -34,9 +30,29 @@ class UserAddressSerializer(serializers.ModelSerializer):
         model = UserAddress
         fields = ('user', 'st_address', 'city', 'state', 'country', 'postal_code')
 
-
-
 class StripeCustomerSerializer(serializers.ModelSerializer):
     class Meta:
         model=StripeCustomer
         fields="__all__"
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    address = serializers.SerializerMethodField()
+    profile = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ['id', 'first_name', 'last_name', 'email', 'phone_no', 'role','password', 'is_active', 'is_verified', 'address', 'profile']
+        extra_kwargs ={
+            "password":{"write_only":True}, 
+        }
+    def get_address(self, obj):
+        # Check if the user has an address
+        if hasattr(obj, 'useraddress'):
+            return UserAddressSerializer(obj.useraddress).data
+        return None
+
+    def get_profile(self, obj):
+        # Check if the user has a profile
+        if hasattr(obj, 'userprofile'):
+            return UserProfileSerializer(obj.userprofile).data
+        return None

@@ -19,5 +19,9 @@ urlpatterns= [
     path("", include(router.urls)),
     path("", include(nested_router.urls)),
     path("verify-email/", VerifyEmailView.as_view()),
+    path("get/", GetUserProfile.as_view()),
+    path("forgot-password/", ForgotPasswordView.as_view()),
+    path('reset-password/<str:token>/', ResetPasswordView.as_view(), name='reset-password'),
+
 ]
 
